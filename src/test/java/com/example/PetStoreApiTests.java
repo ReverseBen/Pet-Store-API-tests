@@ -18,23 +18,25 @@ import static org.hamcrest.Matchers.*;
 public class PetStoreApiTests {
 
     private enum PetStatus {
-        AVAILABLE, PENDING, SOLD;
-
-        public static PetStatus getRandomStatus() {
-            PetStatus[] statuses = values();
-            return statuses[new Random().nextInt(statuses.length)];
-        }
+        AVAILABLE, PENDING, SOLD
     }
 
     private long petId;
     private long categoryId;
     private String categoryName;
     private String petName;
-    private PetStatus petStatus;
+    private long tagId;
+    private String tagName;
+    private String petStatus;
 
     private final Map<String, List<String>> petCategories = Map.of(
             "Cat", List.of("Mirmur", "Whiskers", "Snowball", "Shadow", "Luna"),
             "Dog", List.of("Buddy", "Charlie", "Max", "Bailey", "Rocky")
+    );
+
+    private final Map<String, List<String>> petTags = Map.of(
+            "No owner", List.of(String.valueOf(PetStatus.AVAILABLE).toLowerCase(),String.valueOf(PetStatus.PENDING).toLowerCase()),
+            "Has owner", List.of(String.valueOf(PetStatus.SOLD).toLowerCase())
     );
 
     @BeforeAll
@@ -45,6 +47,7 @@ public class PetStoreApiTests {
         Random random = new Random();
         petId = random.nextInt(1000000);
         categoryId = random.nextInt(1000000);
+        tagId = random.nextInt(1000000);
 
         List<String> categoryKeys = List.copyOf(petCategories.keySet());
         categoryName = categoryKeys.get(random.nextInt(categoryKeys.size()));
@@ -52,7 +55,11 @@ public class PetStoreApiTests {
         List<String> petNamesForCategory = petCategories.get(categoryName);
         petName = petNamesForCategory.get(random.nextInt(petNamesForCategory.size()));
 
-        petStatus = PetStatus.getRandomStatus();
+        List<String> petTagKeys = List.copyOf(petTags.keySet());
+        tagName = petTagKeys.get(random.nextInt(petTagKeys.size()));
+
+        List<String> petStatusFromTag = petTags.get(tagName);
+        petStatus = petStatusFromTag.get(random.nextInt(petStatusFromTag.size()));
     }
 
     @Test
@@ -70,9 +77,15 @@ public class PetStoreApiTests {
                   "photoUrls": [
                     "/img/%s.jpg"
                   ],
+                   "tags": [
+                      {
+                        "id": %d,
+                        "name": "%s"
+                      }
+                   ],
                   "status": "%s"
                 }
-                """.formatted(petId, categoryId, categoryName, petName, petName.toLowerCase(), petStatus.name().toLowerCase());
+                """.formatted(petId, categoryId, categoryName, petName, petName.toLowerCase(), tagId, tagName, petStatus.toLowerCase());
 
         given()
                 .contentType(ContentType.JSON)
@@ -87,7 +100,9 @@ public class PetStoreApiTests {
                 .assertThat().body("name", equalTo(petName))
                 .assertThat().body("photoUrls", notNullValue())
                 .assertThat().body("photoUrls", contains("/img/"+ petName.toLowerCase() +".jpg"))
-                .assertThat().body("status", equalTo(petStatus.name().toLowerCase()));
+                .assertThat().body("tags[0].id", equalTo((int) tagId))
+                .assertThat().body("tags[0].name", equalTo(tagName))
+                .assertThat().body("status", equalTo(petStatus.toLowerCase()));
     }
 
     @Test
@@ -106,7 +121,9 @@ public class PetStoreApiTests {
                 .assertThat().body("name", equalTo(petName))
                 .assertThat().body("photoUrls", notNullValue())
                 .assertThat().body("photoUrls", contains("/img/"+ petName.toLowerCase() +".jpg"))
-                .assertThat().body("status", equalTo(petStatus.name().toLowerCase()));
+                .assertThat().body("tags[0].id", equalTo((int) tagId))
+                .assertThat().body("tags[0].name", equalTo(tagName))
+                .assertThat().body("status", equalTo(petStatus.toLowerCase()));
     }
 
     @Test
@@ -114,7 +131,18 @@ public class PetStoreApiTests {
     @Description("Update the pet information")
     public void testUpdatePet() {
         String newName = petName + " Updated";
-        PetStatus newStatus = PetStatus.SOLD;
+        String newTagName;
+        PetStatus newStatus;
+
+        if (tagName.equals("Has owner") && petStatus.equals("sold"))
+        {
+            newTagName = "No owner";
+            newStatus = PetStatus.AVAILABLE;
+        }
+        else {
+            newTagName = "Has owner";
+            newStatus = PetStatus.SOLD;
+        }
 
         String updatedPetJson = """
                 {
@@ -127,9 +155,15 @@ public class PetStoreApiTests {
                   "photoUrls": [
                     "/img/%s.jpg"
                   ],
+                   "tags": [
+                      {
+                        "id": %d,
+                        "name": "%s"
+                      }
+                   ],
                   "status": "%s"
                 }
-                """.formatted(petId, categoryId, categoryName, newName, petName.toLowerCase(), newStatus.name().toLowerCase());
+                """.formatted(petId, categoryId, categoryName, newName, petName.toLowerCase(), tagId, newTagName, newStatus.name().toLowerCase());
 
         given()
                 .contentType(ContentType.JSON)
@@ -144,10 +178,13 @@ public class PetStoreApiTests {
                 .assertThat().body("name", equalTo(newName))
                 .assertThat().body("photoUrls", notNullValue())
                 .assertThat().body("photoUrls", contains("/img/"+ petName.toLowerCase() +".jpg"))
+                .assertThat().body("tags[0].id", equalTo((int) tagId))
+                .assertThat().body("tags[0].name", equalTo(newTagName))
                 .assertThat().body("status", equalTo(newStatus.name().toLowerCase()));
 
         petName = newName;
-        petStatus = newStatus;
+        tagName = newTagName;
+        petStatus = newStatus.name().toLowerCase();
     }
 
     @Test
@@ -161,7 +198,8 @@ public class PetStoreApiTests {
                 .then()
                 .assertThat().statusCode(200)
                 .assertThat().body("name", equalTo(petName))
-                .assertThat().body("status", equalTo(petStatus.name().toLowerCase()));
+                .assertThat().body("tags[0].name", equalTo(tagName))
+                .assertThat().body("status", equalTo(petStatus));
     }
 
     @Test

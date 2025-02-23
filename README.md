@@ -8,7 +8,7 @@ This project includes a set of automated tests for the PetStore API using JUnit 
 
 2. Retrieve the created pet: The pet is fetched using its ID to verify the creation.
 
-3. Update pet information: The pet's name and status are updated.
+3. Update pet information: The pet's name, tag name and status are updated.
 
 4. Retrieve the updated pet: The updated pet details are validated.
 
